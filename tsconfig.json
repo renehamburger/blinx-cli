@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "lib": ["es2020", "dom"],
+    "module": "commonjs",
+    "esModuleInterop": true,
+    "target": "es2019",
+    // Code quality
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true
+  }
+}

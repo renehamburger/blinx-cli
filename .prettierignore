@@ -1,0 +1,6 @@
+# Ignore all but the file types below to ensure prettier cli and prettier extensions cover the same files
+*.*
+!*.ts
+!*.json
+!*.md
+!/.vscode
