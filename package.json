@@ -1,0 +1,11 @@
+{
+  "name": "blinx.js-crawler",
+  "version": "0.0.1",
+  "description": "Node.js app to analyse a website using blinx.js",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Rene Hamburger",
+  "license": "MIT"
+}
