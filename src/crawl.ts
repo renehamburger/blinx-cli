@@ -57,13 +57,11 @@ export async function crawlPage(browser: puppeteer.Browser, url: string): Promis
       if (osis) {
         references.push({ text: link.innerText, osis });
       } else {
-        const href = link.getAttribute('href');
+        const href = (link.getAttribute('href') || '').replace(/#.*$/, '');
         if (href) {
-          if (!href.startsWith('#')) {
-            const parsedHref = new URL(href, location.origin);
-            if (location.origin === parsedHref.origin) {
-              websiteLinks.push(parsedHref.href);
-            }
+          const parsedHref = new URL(href, location.origin);
+          if (location.origin === parsedHref.origin) {
+            websiteLinks.push(parsedHref.href);
           }
         }
       }
