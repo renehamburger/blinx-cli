@@ -1,10 +1,25 @@
-import { executeCrawl } from './crawl';
+import { executeCrawl, CrawlConfig } from './crawl';
 
-const START_URL = 'https://kurs.bibel-fuer-alle.net/mod/page/view.php?id=122';
-const SCRAPE_WHITELIST = ['https://kurs.bibel-fuer-alle.net/mod/page/view.php'];
-const CRAWL_WHITELIST = ['https://kurs.bibel-fuer-alle.net/course/view.php'];
+if (!process.env.BFA_USERNAME || !process.env.BFA_PASSWORD) {
+  console.error(`BFA_USERNAME and BFA_PASSWORD environment variables required.`);
+  process.exit(1);
+}
 
-executeCrawl(START_URL, SCRAPE_WHITELIST, CRAWL_WHITELIST)
+const config: CrawlConfig = {
+  url: 'https://kurs.bibel-fuer-alle.net/mod/page/view.php?id=122',
+  scrapingWhitelist: ['https://kurs.bibel-fuer-alle.net/mod/page/view.php'],
+  crawlingWhitelist: ['https://kurs.bibel-fuer-alle.net/course/view.php'],
+  onLaunch: async (browser) => {
+    const page = await browser.newPage();
+    await page.goto('https://kurs.bibel-fuer-alle.net/login/index.php');
+    await page.type('#username', process.env.BFA_USERNAME!);
+    await page.type('#password', process.env.BFA_PASSWORD!);
+    await page.keyboard.press('Enter');
+    await page.waitForNavigation();
+  }
+};
+
+executeCrawl(config)
   .then(() => {
     console.log('Crawling finished successfully');
     process.exit(0);

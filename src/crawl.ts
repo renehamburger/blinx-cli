@@ -15,29 +15,35 @@ interface PageLinks {
   websiteLinks: string[];
 }
 
-export async function executeCrawl(
-  initialUrl: string,
-  whitelistForScraping: string[] = [],
-  whitelistForCrawling: string[] = []
-) {
-  whitelistForCrawling = whitelistForCrawling.concat(whitelistForScraping);
+export interface CrawlConfig {
+  url: string;
+  scrapingWhitelist?: string[];
+  crawlingWhitelist?: string[];
+  onLaunch?: (browser: puppeteer.Browser) => Promise<void>;
+}
+
+export async function executeCrawl(config: CrawlConfig) {
+  const scrapingWhitelist = config.scrapingWhitelist || [];
+  const crawlingWhitelist = (config.crawlingWhitelist || []).concat(scrapingWhitelist);
   const browser = await puppeteer.launch();
-  pendingUrls.add(initialUrl);
+  if (config.onLaunch) {
+    await config.onLaunch(browser);
+  }
+  pendingUrls.add(config.url);
   while (pendingUrls.size) {
     const url: string = pendingUrls.values().next().value;
     const { references, websiteLinks } = await crawlPage(browser, url);
     visitedUrls.add(url);
     pendingUrls.delete(url);
     if (
-      whitelistForScraping.length === 0 ||
-      whitelistForScraping.some((entry) => url.startsWith(entry))
+      scrapingWhitelist.length === 0 ||
+      scrapingWhitelist.some((entry) => url.startsWith(entry))
     ) {
       await writeReferencesToFile(url, references);
     }
     websiteLinks.forEach((link) => {
       const isLinkPermitted =
-        whitelistForCrawling.length === 0 ||
-        whitelistForCrawling.some((entry) => link.startsWith(entry));
+        crawlingWhitelist.length === 0 || crawlingWhitelist.some((entry) => link.startsWith(entry));
       if (isLinkPermitted && !visitedUrls.has(link)) {
         pendingUrls.add(link);
       }
