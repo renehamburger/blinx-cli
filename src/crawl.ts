@@ -2,6 +2,8 @@ import puppeteer from 'puppeteer';
 import { promisify } from 'util';
 import * as fs from 'fs';
 
+const OUTPUT_DIR = 'output';
+
 const pendingUrls = new Set<string>();
 const visitedUrls = new Set<string>();
 
@@ -25,10 +27,7 @@ export interface CrawlConfig {
 export async function executeCrawl(config: CrawlConfig) {
   const scrapingWhitelist = config.scrapingWhitelist || [];
   const crawlingWhitelist = (config.crawlingWhitelist || []).concat(scrapingWhitelist);
-  const browser = await puppeteer.launch();
-  if (config.onLaunch) {
-    await config.onLaunch(browser);
-  }
+  const [browser] = await Promise.all([browserSetup(config.onLaunch), ensureOutputDirExists()]);
   pendingUrls.add(config.url);
   while (pendingUrls.size) {
     const url: string = pendingUrls.values().next().value;
@@ -49,6 +48,14 @@ export async function executeCrawl(config: CrawlConfig) {
       }
     });
   }
+}
+
+export async function browserSetup(onLaunch?: CrawlConfig['onLaunch']): Promise<puppeteer.Browser> {
+  const browser = await puppeteer.launch();
+  if (onLaunch) {
+    await onLaunch(browser);
+  }
+  return browser;
 }
 
 export async function crawlPage(browser: puppeteer.Browser, url: string): Promise<PageLinks> {
@@ -79,13 +86,19 @@ export async function crawlPage(browser: puppeteer.Browser, url: string): Promis
   });
 }
 
+async function ensureOutputDirExists() {
+  if (!(await promisify(fs.exists)(OUTPUT_DIR))) {
+    await promisify(fs.mkdir)(OUTPUT_DIR);
+  }
+}
+
 async function writeReferencesToFile(url: string, references: Reference[]) {
   const filename = url
     .replace(/^https?:\/\//, '')
     .replace(/[^a-z0-9]/gi, '_')
     .toLowerCase();
   await promisify(fs.writeFile)(
-    `output/${filename}.json`,
+    `${OUTPUT_DIR}/${filename}.json`,
     JSON.stringify(references, null, 2),
     'utf-8'
   );
