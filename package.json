@@ -1,6 +1,6 @@
 {
   "name": "blinx-cli",
-  "version": "0.0.2",
+  "version": "0.0.4",
   "description": "Node.js app to analyse a website using blinx.js",
   "engines": {
     "node": ">= 12.9.0"
