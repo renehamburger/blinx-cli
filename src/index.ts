@@ -1,22 +1,19 @@
 import { Crawler, CrawlConfig } from './crawl';
 
-if (!process.env.BFA_USERNAME || !process.env.BFA_PASSWORD) {
-  console.error(`BFA_USERNAME and BFA_PASSWORD environment variables required.`);
-  process.exit(1);
-}
-
 const config: CrawlConfig = {
   url: 'https://kurs.bibel-fuer-alle.net/mod/page/view.php?id=122',
   scrapingWhitelist: ['https://kurs.bibel-fuer-alle.net/mod/page/view.php'],
   crawlingWhitelist: ['https://kurs.bibel-fuer-alle.net/course/view.php'],
   queryParamWhitelist: ['id'],
   onLaunch: async (browser) => {
-    const page = await browser.newPage();
-    await page.goto('https://kurs.bibel-fuer-alle.net/login/index.php');
-    await page.type('#username', process.env.BFA_USERNAME!);
-    await page.type('#password', process.env.BFA_PASSWORD!);
-    await page.keyboard.press('Enter');
-    await page.waitForNavigation();
+    if (process.env.BFA_USERNAME || !process.env.BFA_PASSWORD) {
+      const page = await browser.newPage();
+      await page.goto('https://kurs.bibel-fuer-alle.net/login/index.php');
+      await page.type('#username', process.env.BFA_USERNAME!);
+      await page.type('#password', process.env.BFA_PASSWORD!);
+      await page.keyboard.press('Enter');
+      await page.waitForNavigation();
+    }
   },
   concurrency: 5,
   debug: false
