@@ -9,6 +9,7 @@ const config: CrawlConfig = {
   url: 'https://kurs.bibel-fuer-alle.net/mod/page/view.php?id=122',
   scrapingWhitelist: ['https://kurs.bibel-fuer-alle.net/mod/page/view.php'],
   crawlingWhitelist: ['https://kurs.bibel-fuer-alle.net/course/view.php'],
+  queryParamWhitelist: ['id'],
   onLaunch: async (browser) => {
     const page = await browser.newPage();
     await page.goto('https://kurs.bibel-fuer-alle.net/login/index.php');

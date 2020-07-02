@@ -20,6 +20,7 @@ export interface CrawlConfig {
   url: string;
   scrapingWhitelist?: string[];
   crawlingWhitelist?: string[];
+  queryParamWhitelist?: string[];
   onLaunch?: (browser: puppeteer.Browser) => Promise<void>;
   /** Parallel browser sessions crawling. Defaults to 5. */
   concurrency?: number;
@@ -92,7 +93,21 @@ export class Crawler {
     try {
       page = await this.browser.newPage();
       await page.goto(url);
-      const results = await page.evaluate(() => {
+      const results = await page.evaluate((queryParamWhitelist) => {
+        const cleanUrl = (completeUrl: string): string => {
+          const urlWithoutLocation = completeUrl.replace(/#.*$/, '');
+          const [result, queryString] = urlWithoutLocation.split('?');
+          let filteredQueryString = '';
+          if (queryString) {
+            queryString.split('&').forEach((pair) => {
+              const param = pair.split('=')[0];
+              if (queryParamWhitelist.includes(param)) {
+                filteredQueryString += `${filteredQueryString ? '&' : ''}${pair}`;
+              }
+            });
+          }
+          return `${result}${filteredQueryString ? '?' : ''}${filteredQueryString}`;
+        };
         const references: Reference[] = [];
         const websiteLinks: string[] = [];
         document.querySelectorAll('a').forEach((link) => {
@@ -100,7 +115,7 @@ export class Crawler {
           if (osis) {
             references.push({ text: link.innerText, osis });
           } else {
-            const href = (link.getAttribute('href') || '').replace(/#.*$/, '');
+            const href = cleanUrl(link.getAttribute('href') || '');
             if (href) {
               const parsedHref = new URL(href, location.origin);
               if (location.origin === parsedHref.origin) {
@@ -113,7 +128,7 @@ export class Crawler {
           references,
           websiteLinks
         };
-      });
+      }, this.config.queryParamWhitelist || []);
       cb(null, results);
     } catch (err) {
       cb(err);
