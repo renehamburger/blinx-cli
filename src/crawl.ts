@@ -3,6 +3,7 @@ import { promisify } from 'util';
 import * as fs from 'fs';
 import fastq from 'fastq';
 import { Deferred } from './deferred';
+import rimraf from 'rimraf';
 
 const OUTPUT_DIR = 'output';
 
@@ -41,7 +42,7 @@ export class Crawler {
   }
 
   async execute() {
-    await Promise.all([this.setupBrowser(), ensureOutputDirExists()]);
+    await Promise.all([this.setupBrowser(), clearOutputDirectory()]);
     this.enqueueUrl(this.config.url);
     return this.crawlingCompleted.promise;
   }
@@ -146,10 +147,9 @@ export class Crawler {
   }
 }
 
-async function ensureOutputDirExists() {
-  if (!(await promisify(fs.exists)(OUTPUT_DIR))) {
-    await promisify(fs.mkdir)(OUTPUT_DIR);
-  }
+async function clearOutputDirectory() {
+  await promisify(rimraf)(OUTPUT_DIR);
+  await promisify(fs.mkdir)(OUTPUT_DIR);
 }
 
 async function writeReferencesToFile(url: string, references: Reference[]) {
