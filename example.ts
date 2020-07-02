@@ -1,4 +1,5 @@
-import { Crawler, CrawlConfig } from './crawl';
+#!/usr/bin/env -S node -r "ts-node/register/transpile-only"
+import { Crawler, CrawlConfig } from './src/crawl';
 
 const config: CrawlConfig = {
   url: 'https://kurs.bibel-fuer-alle.net/mod/page/view.php?id=122',

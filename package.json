@@ -1,14 +1,14 @@
 {
-  "name": "blinx.js-crawler",
-  "version": "0.0.1",
+  "name": "blinx-cli",
+  "version": "0.0.2",
   "description": "Node.js app to analyse a website using blinx.js",
   "engines": {
     "node": ">= 12.9.0"
   },
   "scripts": {
-    "start": "ts-node --transpile-only src/index.ts",
-    "watch": "nodemon -r ts-node/register src/index.ts",
-    "debug": "nodemon --inspect-brk -r ./node_modules/ts-node/register src/index.ts",
+    "start": "ts-node --transpile-only example.ts",
+    "watch": "nodemon -r ts-node/register example.ts",
+    "debug": "nodemon --inspect-brk -r ./node_modules/ts-node/register/example.ts",
     "test": "echo \"Error: no test specified\" && exit 1",
     "lint": "tslint -c tslint.json -p tsconfig.json",
     "format": "prettier \"**/*.*\" --write",
