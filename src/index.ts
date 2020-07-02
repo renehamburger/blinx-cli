@@ -1,4 +1,4 @@
-import { executeCrawl, CrawlConfig } from './crawl';
+import { Crawler, CrawlConfig } from './crawl';
 
 if (!process.env.BFA_USERNAME || !process.env.BFA_PASSWORD) {
   console.error(`BFA_USERNAME and BFA_PASSWORD environment variables required.`);
@@ -16,10 +16,13 @@ const config: CrawlConfig = {
     await page.type('#password', process.env.BFA_PASSWORD!);
     await page.keyboard.press('Enter');
     await page.waitForNavigation();
-  }
+  },
+  concurrency: 5,
+  debug: false
 };
 
-executeCrawl(config)
+new Crawler(config)
+  .execute()
   .then(() => {
     console.log('Crawling finished successfully');
     process.exit(0);

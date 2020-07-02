@@ -17,6 +17,7 @@
   "author": "Rene Hamburger",
   "license": "MIT",
   "dependencies": {
+    "fastq": "^1.8.0",
     "puppeteer": "^4.0.1",
     "ts-node": "^8.10.2",
     "tslint": "^6.1.2",

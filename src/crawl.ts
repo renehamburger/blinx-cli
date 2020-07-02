@@ -1,11 +1,10 @@
 import puppeteer from 'puppeteer';
 import { promisify } from 'util';
 import * as fs from 'fs';
+import fastq from 'fastq';
+import { Deferred } from './deferred';
 
 const OUTPUT_DIR = 'output';
-
-const pendingUrls = new Set<string>();
-const visitedUrls = new Set<string>();
 
 interface Reference {
   text: string;
@@ -22,68 +21,114 @@ export interface CrawlConfig {
   scrapingWhitelist?: string[];
   crawlingWhitelist?: string[];
   onLaunch?: (browser: puppeteer.Browser) => Promise<void>;
+  /** Parallel browser sessions crawling. Defaults to 5. */
+  concurrency?: number;
+  debug?: boolean;
 }
 
-export async function executeCrawl(config: CrawlConfig) {
-  const scrapingWhitelist = config.scrapingWhitelist || [];
-  const crawlingWhitelist = (config.crawlingWhitelist || []).concat(scrapingWhitelist);
-  const [browser] = await Promise.all([browserSetup(config.onLaunch), ensureOutputDirExists()]);
-  pendingUrls.add(config.url);
-  while (pendingUrls.size) {
-    const url: string = pendingUrls.values().next().value;
-    const { references, websiteLinks } = await crawlPage(browser, url);
-    visitedUrls.add(url);
-    pendingUrls.delete(url);
-    if (
-      scrapingWhitelist.length === 0 ||
-      scrapingWhitelist.some((entry) => url.startsWith(entry))
-    ) {
-      await writeReferencesToFile(url, references);
+export class Crawler {
+  private readonly queuedUrls = new Set<string>();
+  private readonly queue = fastq(this, this.crawlPage, this.config.concurrency || 5);
+  private readonly scrapingWhitelist: string[];
+  private readonly crawlingWhitelist: string[];
+  private readonly crawlingCompleted = new Deferred();
+  private browser!: puppeteer.Browser;
+
+  constructor(private readonly config: CrawlConfig) {
+    this.scrapingWhitelist = this.config.scrapingWhitelist || [];
+    this.crawlingWhitelist = (this.config.crawlingWhitelist || []).concat(this.scrapingWhitelist);
+  }
+
+  async execute() {
+    await Promise.all([this.setupBrowser(), ensureOutputDirExists()]);
+    this.enqueueUrl(this.config.url);
+    return this.crawlingCompleted.promise;
+  }
+
+  private async setupBrowser() {
+    this.browser = await puppeteer.launch({ headless: !this.config.debug });
+    if (this.config.onLaunch) {
+      await this.config.onLaunch(this.browser);
     }
-    websiteLinks.forEach((link) => {
-      const isLinkPermitted =
-        crawlingWhitelist.length === 0 || crawlingWhitelist.some((entry) => link.startsWith(entry));
-      if (isLinkPermitted && !visitedUrls.has(link)) {
-        pendingUrls.add(link);
-      }
-    });
   }
-}
 
-export async function browserSetup(onLaunch?: CrawlConfig['onLaunch']): Promise<puppeteer.Browser> {
-  const browser = await puppeteer.launch();
-  if (onLaunch) {
-    await onLaunch(browser);
-  }
-  return browser;
-}
-
-export async function crawlPage(browser: puppeteer.Browser, url: string): Promise<PageLinks> {
-  console.debug(`Retrieving ${url}`);
-  const page = await browser.newPage();
-  await page.goto(url);
-  return await page.evaluate(() => {
-    const references: Reference[] = [];
-    const websiteLinks: string[] = [];
-    document.querySelectorAll('a').forEach((link) => {
-      const osis = link.getAttribute('data-osis');
-      if (osis) {
-        references.push({ text: link.innerText, osis });
-      } else {
-        const href = (link.getAttribute('href') || '').replace(/#.*$/, '');
-        if (href) {
-          const parsedHref = new URL(href, location.origin);
-          if (location.origin === parsedHref.origin) {
-            websiteLinks.push(parsedHref.href);
+  private enqueueUrl(url: string) {
+    if (!this.queuedUrls.has(url)) {
+      this.queuedUrls.add(url);
+      this.queue.push(url, async (err, result?: PageLinks) => {
+        if (err) {
+          console.error(`Failed to crawl '${url}':`, err);
+        } else if (result) {
+          if (
+            this.scrapingWhitelist.length === 0 ||
+            this.scrapingWhitelist.some((entry) => url.startsWith(entry))
+          ) {
+            await writeReferencesToFile(url, result.references);
+            console.log(`${result.references.length} references saved for ${url}`);
           }
+          result.websiteLinks.forEach((link: string) => {
+            const isLinkPermitted =
+              this.crawlingWhitelist.length === 0 ||
+              this.crawlingWhitelist.some((entry) => link.startsWith(entry));
+            if (isLinkPermitted) {
+              this.enqueueUrl(link);
+            }
+          });
+          setTimeout(() => {
+            if (this.queue.idle()) {
+              this.crawlingCompleted.resolve();
+            } else {
+              console.log(`${this.queuedUrls.size - this.queue.length()}/${this.queuedUrls.size}`);
+            }
+          });
         }
+      });
+    }
+  }
+
+  private async crawlPage(url: string, cb: fastq.done<PageLinks>) {
+    this.debug(`Retrieving ${url}`);
+    let page: puppeteer.Page | undefined;
+    try {
+      page = await this.browser.newPage();
+      await page.goto(url);
+      const results = await page.evaluate(() => {
+        const references: Reference[] = [];
+        const websiteLinks: string[] = [];
+        document.querySelectorAll('a').forEach((link) => {
+          const osis = link.getAttribute('data-osis');
+          if (osis) {
+            references.push({ text: link.innerText, osis });
+          } else {
+            const href = (link.getAttribute('href') || '').replace(/#.*$/, '');
+            if (href) {
+              const parsedHref = new URL(href, location.origin);
+              if (location.origin === parsedHref.origin) {
+                websiteLinks.push(parsedHref.href);
+              }
+            }
+          }
+        });
+        return {
+          references,
+          websiteLinks
+        };
+      });
+      cb(null, results);
+    } catch (err) {
+      cb(err);
+    } finally {
+      if (page) {
+        await page.close();
       }
-    });
-    return {
-      references,
-      websiteLinks
-    };
-  });
+    }
+  }
+
+  private debug(...args: any[]) {
+    if (this.config.debug) {
+      console.debug(...args);
+    }
+  }
 }
 
 async function ensureOutputDirExists() {
