@@ -5,8 +5,6 @@ import fastq from 'fastq';
 import { Deferred } from './deferred';
 import rimraf from 'rimraf';
 
-const OUTPUT_DIR = 'output';
-
 interface Reference {
   text: string;
   osis: string;
@@ -32,6 +30,8 @@ export interface CrawlConfig {
   concurrency?: number;
   /** Activate debug output */
   debug?: boolean;
+  /** Output directory, which will always be emptied on start; defaults to `output` */
+  dir?: string;
 }
 
 export class Crawler {
@@ -40,6 +40,7 @@ export class Crawler {
   private readonly scrapingWhitelist: string[];
   private readonly crawlingWhitelist: string[];
   private readonly crawlingCompleted = new Deferred();
+  private readonly outputDir = this.config.dir || 'output';
   private browser!: puppeteer.Browser;
 
   constructor(private readonly config: CrawlConfig) {
@@ -48,7 +49,7 @@ export class Crawler {
   }
 
   async execute() {
-    await Promise.all([this.setupBrowser(), clearOutputDirectory()]);
+    await Promise.all([this.setupBrowser(), this.clearOutputDirectory()]);
     this.enqueueUrl(this.config.url);
     return this.crawlingCompleted.promise;
   }
@@ -71,7 +72,7 @@ export class Crawler {
             this.scrapingWhitelist.length === 0 ||
             this.scrapingWhitelist.some((entry) => url.startsWith(entry))
           ) {
-            await writeReferencesToFile(url, result.references);
+            await this.writeReferencesToFile(url, result.references);
             console.log(`${result.references.length} references saved for ${url}`);
           }
           result.websiteLinks.forEach((link: string) => {
@@ -151,21 +152,20 @@ export class Crawler {
       console.debug(...args);
     }
   }
-}
+  private async clearOutputDirectory() {
+    await promisify(rimraf)(this.outputDir);
+    await promisify(fs.mkdir)(this.outputDir);
+  }
 
-async function clearOutputDirectory() {
-  await promisify(rimraf)(OUTPUT_DIR);
-  await promisify(fs.mkdir)(OUTPUT_DIR);
-}
-
-async function writeReferencesToFile(url: string, references: Reference[]) {
-  const filename = url
-    .replace(/^https?:\/\//, '')
-    .replace(/[^a-z0-9]/gi, '_')
-    .toLowerCase();
-  await promisify(fs.writeFile)(
-    `${OUTPUT_DIR}/${filename}.json`,
-    JSON.stringify(references, null, 2),
-    'utf-8'
-  );
+  private async writeReferencesToFile(url: string, references: Reference[]) {
+    const filename = url
+      .replace(/^https?:\/\//, '')
+      .replace(/[^a-z0-9]/gi, '_')
+      .toLowerCase();
+    await promisify(fs.writeFile)(
+      `${this.outputDir}/${filename}.json`,
+      JSON.stringify(references, null, 2),
+      'utf-8'
+    );
+  }
 }
