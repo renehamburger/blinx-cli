@@ -18,13 +18,19 @@ interface PageLinks {
 }
 
 export interface CrawlConfig {
+  /** Initial URL to start crawling at. */
   url: string;
+  /** Whitelist of URL paths that should be scraped for references */
   scrapingWhitelist?: string[];
+  /** Whitelist of URL paths that should be crawled; scrapingWhitelist is implied here */
   crawlingWhitelist?: string[];
+  /** List of query parameters that are significant */
   queryParamWhitelist?: string[];
+  /** Function to be executed before the crawling starts, e.g. to log in */
   onLaunch?: (browser: puppeteer.Browser) => Promise<void>;
-  /** Parallel browser sessions crawling. Defaults to 5. */
+  /** Parallel browser sessions crawling; defaults to 5 */
   concurrency?: number;
+  /** Activate debug output */
   debug?: boolean;
 }
 
